@@ -1,7 +1,7 @@
 {
 	"id": "hot-reload-picker",
 	"name": "Hot Reload Picker",
-	"version": "1.1.6",
+	"version": "1.1.7",
 	"minAppVersion": "1.12.7",
 	"description": "Reload enabled plugins from the command palette for faster plugin development.",
 	"author": "Lemon695",

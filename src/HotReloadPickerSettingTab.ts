@@ -30,12 +30,6 @@ export class HotReloadPickerSettingTab extends PluginSettingTab {
 	}
 
 	private refreshSettingsView(): void {
-		const settingTab = this as HotReloadPickerSettingTab & { update?: () => void };
-		if (typeof settingTab.update === 'function') {
-			settingTab.update();
-			return;
-		}
-
 		this.renderLegacySettings();
 	}
 
