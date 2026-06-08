@@ -1,99 +1,205 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import { Notice, Plugin } from 'obsidian';
+import { PluginPickerModal } from './PluginPickerModal';
+import { BatchReloadModal } from './BatchReloadModal';
+import { HotReloadPickerSettingTab } from './HotReloadPickerSettingTab';
+import { HotReloadPickerSettings, DEFAULT_SETTINGS } from './settings';
+import { getStrings, HotReloadPickerStrings } from './i18n';
+import { getPluginManager } from './obsidian-internal';
 
-// Remember to rename these classes and interfaces!
-
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
-
-	async onload() {
-		await this.loadSettings();
-
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			}
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
-	}
-
-	onunload() {
-	}
-
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
+export interface ReloadablePluginItem {
+	id: string;
+	name: string;
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
+export default class HotReloadPickerPlugin extends Plugin {
+	settings: HotReloadPickerSettings = { ...DEFAULT_SETTINGS };
+	readonly strings: HotReloadPickerStrings = getStrings();
+	private quickCommandIds: Set<string> = new Set();
+
+	async onload(): Promise<void> {
+		await this.loadSettings();
+
+		this.addCommand({
+			id: 'hot-reload-plugin',
+			name: this.strings.commands.hotReloadPlugin,
+			callback: () => {
+				new PluginPickerModal(this.app, this).open();
+			}
+		});
+
+		this.addCommand({
+			id: 'reload-last-plugin',
+			name: this.strings.commands.reloadLastPlugin,
+			callback: () => {
+				void this.reloadLastPlugin();
+			}
+		});
+
+		this.addCommand({
+			id: 'toggle-favorite-last-plugin',
+			name: this.strings.commands.toggleFavoriteLastPlugin,
+			callback: () => {
+				void this.toggleFavoriteLastPlugin();
+			}
+		});
+
+		this.addCommand({
+			id: 'batch-reload-plugins',
+			name: this.strings.commands.batchReloadPlugins,
+			callback: () => {
+				new BatchReloadModal(this.app, this).open();
+			}
+		});
+
+		this.addSettingTab(new HotReloadPickerSettingTab(this.app, this));
+		this.registerConfiguredPluginCommands();
 	}
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
+	onunload(): void {
 	}
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
+	async loadSettings(): Promise<void> {
+		const data = await this.loadData() as Partial<HotReloadPickerSettings> | null;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, data ?? {});
+		this.settings.favoritePluginIds = this.normalizePluginIds(this.settings.favoritePluginIds);
+		this.settings.commandPluginIds = this.normalizePluginIds(this.settings.commandPluginIds);
+	}
+
+	async saveSettings(): Promise<void> {
+		await this.saveData(this.settings);
+	}
+
+	isFavoritePlugin(pluginId: string): boolean {
+		return this.settings.favoritePluginIds.includes(pluginId);
+	}
+
+	getReloadablePlugins(): ReloadablePluginItem[] {
+		const plugins = getPluginManager(this.app).plugins;
+		const items = Object.values(plugins).map(plugin => ({
+			id: plugin.manifest.id,
+			name: plugin.manifest.name
+		}));
+
+		if (this.settings.excludeSelf) {
+			return items.filter(item => item.id !== this.manifest.id);
+		}
+
+		return items;
+	}
+
+	registerConfiguredPluginCommands(): void {
+		const availablePluginIds = new Set(this.getReloadablePlugins().map(plugin => plugin.id));
+
+		for (const commandId of this.quickCommandIds) {
+			this.removeCommand(commandId);
+		}
+
+		this.quickCommandIds.clear();
+
+		for (const pluginId of this.settings.commandPluginIds) {
+			if (availablePluginIds.has(pluginId)) {
+				this.registerQuickReloadCommand(pluginId);
+			}
+		}
+	}
+
+	sortPluginsByFavorite<T extends { id: string; name: string }>(items: T[]): T[] {
+		const sortedItems = [...items];
+		sortedItems.sort((a, b) => this.comparePluginsByFavorite(a, b));
+		return sortedItems;
+	}
+
+	async reloadPluginById(pluginId: string): Promise<void> {
+		const pluginManager = getPluginManager(this.app);
+		const targetPlugin = pluginManager.plugins[pluginId];
+
+		if (!targetPlugin) {
+			new Notice(this.strings.notices.pluginMissing(pluginId));
+			return;
+		}
+
+		try {
+			await pluginManager.disablePlugin(pluginId);
+			await pluginManager.enablePlugin(pluginId);
+			this.settings.lastReloadedPluginId = pluginId;
+			await this.saveSettings();
+			new Notice(this.strings.notices.reloaded(targetPlugin.manifest.name));
+		} catch (e) {
+			const error = e instanceof Error ? e : new Error(String(e));
+			new Notice(this.strings.notices.reloadFailed(targetPlugin.manifest.name, error.message));
+		}
+	}
+
+	private registerQuickReloadCommand(pluginId: string): void {
+		const commandId = this.getQuickReloadCommandId(pluginId);
+		const pluginName = this.getPluginName(pluginId);
+		this.addCommand({
+			id: commandId,
+			name: this.strings.notices.quickReloadCommandName(pluginName),
+			callback: () => {
+				void this.reloadPluginById(pluginId);
+			}
+		});
+		this.quickCommandIds.add(commandId);
+	}
+
+	private getQuickReloadCommandId(pluginId: string): string {
+		const safeId = pluginId.replace(/[^a-zA-Z0-9_-]/g, '-');
+		return `quick-reload-${safeId}`;
+	}
+
+	private getPluginName(pluginId: string): string {
+		return getPluginManager(this.app).plugins[pluginId]?.manifest.name ?? pluginId;
+	}
+
+	private comparePluginsByFavorite(a: { id: string; name: string }, b: { id: string; name: string }): number {
+		const favoriteDiff = Number(this.isFavoritePlugin(b.id)) - Number(this.isFavoritePlugin(a.id));
+		if (favoriteDiff !== 0) {
+			return favoriteDiff;
+		}
+
+		return a.name.localeCompare(b.name, 'zh-Hans');
+	}
+
+	private async reloadLastPlugin(): Promise<void> {
+		const pluginId = this.settings.lastReloadedPluginId;
+
+		if (!pluginId) {
+			new Notice(this.strings.notices.noLastReloadedPlugin);
+			return;
+		}
+
+		await this.reloadPluginById(pluginId);
+	}
+
+	private async toggleFavoriteLastPlugin(): Promise<void> {
+		const pluginId = this.settings.lastReloadedPluginId;
+
+		if (!pluginId) {
+			new Notice(this.strings.notices.noLastReloadedPluginForFavorite);
+			return;
+		}
+
+		const pluginName = this.getPluginName(pluginId);
+		const favoriteIds = this.settings.favoritePluginIds;
+
+		if (favoriteIds.includes(pluginId)) {
+			this.settings.favoritePluginIds = favoriteIds.filter(id => id !== pluginId);
+			await this.saveSettings();
+			new Notice(this.strings.notices.favoriteRemoved(pluginName));
+			return;
+		}
+
+		this.settings.favoritePluginIds = [...favoriteIds, pluginId];
+		await this.saveSettings();
+		new Notice(this.strings.notices.favoriteAdded(pluginName));
+	}
+
+	private normalizePluginIds(value: unknown): string[] {
+		if (!Array.isArray(value)) {
+			return [];
+		}
+
+		return [...new Set(value.filter((item): item is string => typeof item === 'string'))];
 	}
 }

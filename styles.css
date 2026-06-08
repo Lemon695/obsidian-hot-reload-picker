@@ -1,8 +1,43 @@
-/*
+/* 批量重载模态框样式 */
+.hot-reload-batch-list {
+	max-height: 400px;
+	overflow-y: auto;
+	margin: 1em 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	padding: 0.5em;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.hot-reload-batch-select-all {
+	margin-bottom: 1em;
+}
 
-If your plugin does not need CSS, delete this file.
+.hot-reload-batch-status {
+	margin: 0.75em 0;
+	color: var(--text-muted);
+}
 
-*/
+.hot-reload-batch-buttons {
+	margin-top: 1em;
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.5em;
+}
+
+.hot-reload-favorite-marker,
+.hot-reload-last-reloaded {
+	width: 1em;
+	height: 1em;
+	margin-inline-start: 0.35em;
+	vertical-align: -0.15em;
+}
+
+/* 常用插件 SVG 标记 */
+.hot-reload-favorite-marker {
+	color: var(--text-accent);
+}
+
+/* 上次重载 SVG 标记 */
+.hot-reload-last-reloaded {
+	color: var(--text-muted);
+}
