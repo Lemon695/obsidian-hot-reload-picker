@@ -1,6 +1,7 @@
 import { App, FuzzySuggestModal, FuzzyMatch } from 'obsidian';
 import HotReloadPickerPlugin from './main';
 import { ReloadablePluginItem } from './main';
+import { createSvgElement } from './svg';
 
 export class PluginPickerModal extends FuzzySuggestModal<ReloadablePluginItem> {
 	plugin: HotReloadPickerPlugin;
@@ -43,13 +44,13 @@ export class PluginPickerModal extends FuzzySuggestModal<ReloadablePluginItem> {
 	}
 
 	private renderFavoriteIcon(container: HTMLElement): void {
-		const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		const icon = createSvgElement(container, 'svg');
 		icon.setAttribute('class', 'hot-reload-favorite-marker');
 		icon.setAttribute('viewBox', '0 0 24 24');
 		icon.setAttribute('aria-label', this.plugin.strings.labels.favorite);
 		icon.setAttribute('role', 'img');
 
-		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+		const path = createSvgElement(container, 'path');
 		path.setAttribute('d', 'M12 3.2 14.7 8l5.4 1-3.8 4 0.7 5.5-5-2.3-5 2.3 0.7-5.5-3.8-4 5.4-1z');
 		path.setAttribute('fill', 'currentColor');
 		icon.appendChild(path);
@@ -57,13 +58,13 @@ export class PluginPickerModal extends FuzzySuggestModal<ReloadablePluginItem> {
 	}
 
 	private renderLastReloadedIcon(container: HTMLElement): void {
-		const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		const icon = createSvgElement(container, 'svg');
 		icon.setAttribute('class', 'hot-reload-last-reloaded');
 		icon.setAttribute('viewBox', '0 0 24 24');
 		icon.setAttribute('aria-label', this.plugin.strings.labels.lastReloaded);
 		icon.setAttribute('role', 'img');
 
-		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+		const path = createSvgElement(container, 'path');
 		path.setAttribute('d', 'M17.7 6.3A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.45 5.1 1 1 0 1 0-1.86.74A6 6 0 1 1 16.2 7.8L14 10h6V4z');
 		path.setAttribute('fill', 'currentColor');
 		icon.appendChild(path);

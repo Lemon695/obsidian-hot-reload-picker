@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-hot-reload-picker",
-	"version": "1.1.4",
-	"description": "Reload enabled plugins from the command palette for faster Obsidian plugin development.",
+	"version": "1.1.5",
+	"description": "Reload enabled plugins from the command palette for faster plugin development.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {

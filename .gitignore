@@ -28,3 +28,4 @@ CLAUDE.local.md
 /dist
 /.codex/hooks.json
 .omx
+/.github/workflows/release.yml

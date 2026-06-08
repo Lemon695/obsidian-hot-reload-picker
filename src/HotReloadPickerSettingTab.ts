@@ -12,6 +12,10 @@ export class HotReloadPickerSettingTab extends PluginSettingTab {
 	}
 
 	display(): void {
+		this.renderLegacySettings();
+	}
+
+	private renderLegacySettings(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 
@@ -23,6 +27,16 @@ export class HotReloadPickerSettingTab extends PluginSettingTab {
 		this.renderConfiguredCommands(containerEl);
 		this.renderAddCommandControl(containerEl);
 		this.renderGeneralSettings(containerEl);
+	}
+
+	private refreshSettingsView(): void {
+		const settingTab = this as HotReloadPickerSettingTab & { update?: () => void };
+		if (typeof settingTab.update === 'function') {
+			settingTab.update();
+			return;
+		}
+
+		this.renderLegacySettings();
 	}
 
 	private renderConfiguredCommands(containerEl: HTMLElement): void {
@@ -83,14 +97,14 @@ export class HotReloadPickerSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName(this.plugin.strings.settings.hideSelf)
 			.setDesc(this.plugin.strings.settings.hideSelfDesc)
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.excludeSelf)
-				.onChange(async value => {
-					this.plugin.settings.excludeSelf = value;
-					this.plugin.registerConfiguredPluginCommands();
-					await this.plugin.saveSettings();
-					this.display();
-				}));
+				.addToggle(toggle => toggle
+					.setValue(this.plugin.settings.excludeSelf)
+					.onChange(async value => {
+						this.plugin.settings.excludeSelf = value;
+						this.plugin.registerConfiguredPluginCommands();
+						await this.plugin.saveSettings();
+						this.refreshSettingsView();
+					}));
 	}
 
 	private async addCommandPlugin(pluginId: string): Promise<void> {
@@ -100,7 +114,7 @@ export class HotReloadPickerSettingTab extends PluginSettingTab {
 		]);
 		await this.plugin.saveSettings();
 		this.plugin.registerConfiguredPluginCommands();
-		this.display();
+		this.refreshSettingsView();
 	}
 
 	private async removeCommandPlugin(pluginId: string): Promise<void> {
@@ -127,7 +141,7 @@ export class HotReloadPickerSettingTab extends PluginSettingTab {
 	private async saveCommandOrder(): Promise<void> {
 		await this.plugin.saveSettings();
 		this.plugin.registerConfiguredPluginCommands();
-		this.display();
+		this.refreshSettingsView();
 	}
 
 	private hasAvailablePluginOptions(): boolean {
